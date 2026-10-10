@@ -197,6 +197,8 @@ export function apply(ctx, config) {
       const engine = analysis.GHIDRA_INSTALL_DIR ?? '(none discovered — native analysis unavailable)'
       lines.push(`- native engine: ${engine}`)
       if (analysis.JAVA_HOME !== undefined) lines.push(`- jdk: ${analysis.JAVA_HOME}`)
+      if (analysis.REA_JADX_MCP_JAR !== undefined) lines.push(`- android: ${analysis.REA_JADX_MCP_JAR}`)
+      if (analysis.REA_PWNTOOLS_PYTHON !== undefined) lines.push(`- elf provider python: ${analysis.REA_PWNTOOLS_PYTHON}`)
       if (docs.packageRoot !== undefined) {
         lines.push(`- package root: ${docs.packageRoot}`)
         if (docs.skillPath !== undefined) lines.push(`- workflow skill: ${docs.skillPath}`)

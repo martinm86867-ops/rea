@@ -158,6 +158,7 @@ async function main() {
   const discovered = discoverAnalysisEnv({})
   check('engine discovery finds Ghidra', typeof discovered.GHIDRA_INSTALL_DIR === 'string', discovered.GHIDRA_INSTALL_DIR ?? 'none configured')
   check('engine discovery finds the Android JAR', typeof discovered.REA_JADX_MCP_JAR === 'string', discovered.REA_JADX_MCP_JAR ?? 'none configured')
+  check('engine discovery finds the ELF provider python', typeof discovered.REA_PWNTOOLS_PYTHON === 'string', discovered.REA_PWNTOOLS_PYTHON ?? 'none configured')
   check('ambient Ghidra override wins',
     discoverAnalysisEnv({ env: { GHIDRA_INSTALL_DIR: '/declared/ghidra' } }).GHIDRA_INSTALL_DIR === '/declared/ghidra')
   check('ambient jadx override wins',

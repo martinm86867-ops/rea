@@ -133,6 +133,30 @@ export function discoverAnalysisEnv(options = {}) {
     }
   }
 
+  /**
+   * REA's pwntools-elf provider needs an absolute Python carrying exactly
+   * pwntools 4.15.0 / pyelftools 0.33 / unicorn 2.1.2. A standalone 3.13
+   * interpreter is the only interpreter that can satisfy those pins here,
+   * because unicorn 2.1.2 publishes no cp314 wheel.
+   */
+  const declaredPython = env.REA_PWNTOOLS_PYTHON
+  if (typeof declaredPython === 'string' && declaredPython.length > 0) {
+    additions.REA_PWNTOOLS_PYTHON = declaredPython
+  } else {
+    const optRoot = join(home, '.local', 'opt')
+    let names = []
+    try {
+      names = readdir(optRoot)
+    } catch {
+      // No opt root: nothing to probe.
+    }
+    const hit = names
+      .filter((name) => /^py3\d+$/.test(name))
+      .map((name) => join(optRoot, name, 'bin', 'python'))
+      .find((candidate) => exists(candidate))
+    if (hit !== undefined) additions.REA_PWNTOOLS_PYTHON = hit
+  }
+
   /** Whether a directory is a full JDK (Ghidra refuses a bare JRE). */
   const isJdk = (dir) => exists(join(dir, 'bin', 'java'))
   const declaredJava = env.JAVA_HOME

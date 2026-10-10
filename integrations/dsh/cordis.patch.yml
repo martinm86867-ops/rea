@@ -1,0 +1,25 @@
+# dsh-rea bundle patch — inserts the REA gateway row into a DSH profile.
+#
+# The row names this package, which is what makes the loader read
+# `dsh.bundle.patch` and mount `index.js` as a host plugin. The plugin then:
+#   * spawns `rea mcp` and speaks MCP over stdio to it,
+#   * registers four routing tools (rea_status, rea_search_tools,
+#     rea_tool_schema, rea_call) instead of REA's full 139-tool, ~1.87 MB schema set,
+#   * registers the `reverse-engineer-with-rea` runtime skill.
+#
+# Optional row config (all fields fall back to environment variables):
+#
+#   - id: rea
+#     name: dsh-rea
+#     config:
+#       command: /path/to/rea          # default: $REA_DSH_BIN, ~/.local/bin/rea, then PATH
+#       cwd: /path/to/workspace        # default: $DSH_REA_CWD, then the host process cwd
+#       maxResultChars: 200000         # default: $REA_DSH_MAX_RESULT_CHARS
+#       callTimeoutMs: 900000          # default: $REA_DSH_CALL_TIMEOUT_MS
+#
+# Deleting this entry (or dropping the package from the profile) removes the row,
+# the tools, and the skill together. Nothing else in the harness references it,
+# and REA itself keeps working as an ordinary CLI and MCP server.
+- insert:
+    - id: rea
+      name: dsh-rea

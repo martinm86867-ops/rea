@@ -1,0 +1,34 @@
+{
+  "name": "dsh-rea",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "REA reverse-engineering tools for DeepSeek Harness, behind a context-safe gateway: 139 upstream MCP tools routed through four token-cheap tools.",
+  "license": "MIT",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "bridge.mjs",
+    "catalog.mjs",
+    "cordis.patch.yml",
+    "skills/",
+    "verify.mjs",
+    "README.md"
+  ],
+  "scripts": {
+    "verify": "node verify.mjs",
+    "check": "node --check index.js && node --check bridge.mjs && node --check catalog.mjs && node --check verify.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}

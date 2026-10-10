@@ -10,6 +10,7 @@
  * Usage: node verify.mjs [--verbose]
  */
 
+import { discoverAnalysisEnv } from './bridge.mjs'
 import { buildCatalog, flattenCallResult, searchCatalog } from './catalog.mjs'
 
 const verbose = process.argv.includes('--verbose')
@@ -151,6 +152,16 @@ async function main() {
   check('catalog search tolerates a missing token', searchCatalog(built, 'alpha nonexistentword')[0]?.name === 'alpha_tool')
   const flat = flattenCallResult({ content: [{ type: 'text', text: 'x'.repeat(50) }] }, 10)
   check('result truncation is explicit', flat.text.includes('[truncated:'))
+
+  // Engine discovery: the plugin hands REA a working native provider and the
+  // Android JAR without the operator exporting anything.
+  const discovered = discoverAnalysisEnv({})
+  check('engine discovery finds Ghidra', typeof discovered.GHIDRA_INSTALL_DIR === 'string', discovered.GHIDRA_INSTALL_DIR ?? 'none configured')
+  check('engine discovery finds the Android JAR', typeof discovered.REA_JADX_MCP_JAR === 'string', discovered.REA_JADX_MCP_JAR ?? 'none configured')
+  check('ambient Ghidra override wins',
+    discoverAnalysisEnv({ env: { GHIDRA_INSTALL_DIR: '/declared/ghidra' } }).GHIDRA_INSTALL_DIR === '/declared/ghidra')
+  check('ambient jadx override wins',
+    discoverAnalysisEnv({ env: { REA_JADX_MCP_JAR: '/declared/jadx.jar' } }).REA_JADX_MCP_JAR === '/declared/jadx.jar')
 
   // Release the spawned `rea mcp` child so this process can exit.
   for (const dispose of state.effects) if (typeof dispose === 'function') dispose()

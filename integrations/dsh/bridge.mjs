@@ -119,6 +119,20 @@ export function discoverAnalysisEnv(options = {}) {
     }
   }
 
+  /** REA's Android provider wraps a pinned jadx-headless-mcp JAR. */
+  const declaredJadx = env.REA_JADX_MCP_JAR
+  if (typeof declaredJadx === 'string' && declaredJadx.length > 0) {
+    additions.REA_JADX_MCP_JAR = declaredJadx
+  } else {
+    const dir = join(home, '.local', 'opt', 'jadx-mcp')
+    try {
+      const hit = readdir(dir).filter((name) => name.endsWith('-all.jar')).sort()[0]
+      if (hit !== undefined) additions.REA_JADX_MCP_JAR = join(dir, hit)
+    } catch {
+      // No staged JAR: Android analysis stays unavailable, everything else works.
+    }
+  }
+
   /** Whether a directory is a full JDK (Ghidra refuses a bare JRE). */
   const isJdk = (dir) => exists(join(dir, 'bin', 'java'))
   const declaredJava = env.JAVA_HOME

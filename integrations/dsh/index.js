@@ -24,7 +24,7 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { locateRea, ReaMcpClient } from './bridge.mjs'
+import { discoverAnalysisEnv, locateRea, ReaMcpClient } from './bridge.mjs'
 import { buildCatalog, describeEntry, DEFAULT_SEARCH_LIMIT, flattenCallResult, searchCatalog } from './catalog.mjs'
 
 /** Cordis plugin name used by loader diagnostics. */
@@ -128,8 +128,15 @@ export function apply(ctx, config) {
   const callTimeoutMs = Number(options.callTimeoutMs ?? env.REA_DSH_CALL_TIMEOUT_MS ?? 900_000)
 
   const docs = discoverReaDocs(located)
+
+  // Inject a discovered analysis engine and JDK, so the operator never has to
+  // export GHIDRA_INSTALL_DIR or JAVA_HOME before starting the harness.
+  const analysis = options.analysis === false ? {} : discoverAnalysisEnv({ env })
+  const childEnv = { ...env, ...analysis, ...(options.env !== null && typeof options.env === 'object' ? options.env : {}) }
+
   const client = new ReaMcpClient({
     located,
+    env: childEnv,
     cwd: typeof options.cwd === 'string' ? options.cwd : (env.DSH_REA_CWD ?? process.cwd()),
     callTimeoutMs: Number.isFinite(callTimeoutMs) ? callTimeoutMs : 900_000,
     logger: (message) => { ctx.logger?.info?.(`dsh-rea: ${message}`) },
@@ -187,6 +194,9 @@ export function apply(ctx, config) {
         lines.push(`- bridge target: ${located.command} (${located.source})`)
         lines.push('- install: npm install --global rea-agents')
       }
+      const engine = analysis.GHIDRA_INSTALL_DIR ?? '(none discovered — native analysis unavailable)'
+      lines.push(`- native engine: ${engine}`)
+      if (analysis.JAVA_HOME !== undefined) lines.push(`- jdk: ${analysis.JAVA_HOME}`)
       if (docs.packageRoot !== undefined) {
         lines.push(`- package root: ${docs.packageRoot}`)
         if (docs.skillPath !== undefined) lines.push(`- workflow skill: ${docs.skillPath}`)

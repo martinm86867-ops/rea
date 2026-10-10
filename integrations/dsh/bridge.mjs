@@ -14,7 +14,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { accessSync, constants, existsSync } from 'node:fs'
+import { accessSync, constants, existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { delimiter, isAbsolute, join } from 'node:path'
 
@@ -23,6 +23,17 @@ export const PROTOCOL_VERSION = '2025-11-25'
 
 /** Received-stderr ring buffer size kept for diagnostics. */
 const STDERR_LIMIT = 8_192
+
+/** Whether `path` exists and carries an execute bit. */
+function isExecutable(path, exists = existsSync) {
+  if (!exists(path)) return false
+  try {
+    accessSync(path, constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
 
 /**
  * Locate the `rea` executable.
@@ -38,15 +49,6 @@ export function locateRea(options = {}) {
   const env = options.env ?? process.env
   const home = options.home ?? homedir()
   const exists = options.exists ?? existsSync
-  const isExecutable = (path) => {
-    if (!exists(path)) return false
-    try {
-      accessSync(path, constants.X_OK)
-      return true
-    } catch {
-      return false
-    }
-  }
 
   for (const key of ['REA_DSH_BIN', 'REA_BIN']) {
     const explicit = env[key]
@@ -65,6 +67,80 @@ export function locateRea(options = {}) {
   }
 
   return { command: 'rea', args: [], source: 'fallback', found: false }
+}
+
+/**
+ * Discover a native analysis engine and a JDK so REA works with zero
+ * configuration.
+ *
+ * REA reads `GHIDRA_INSTALL_DIR` from its environment and needs a real JDK on
+ * PATH. Making the operator export both before every harness start is exactly
+ * the kind of manual ritual that turns a working engine into an unused one, so
+ * the plugin probes the usual user-local install roots and injects what it
+ * finds into the child environment. Anything already present wins.
+ *
+ * @param options - Environment, home, and filesystem seams for testing.
+ * @returns Environment additions; empty when nothing was discovered.
+ */
+export function discoverAnalysisEnv(options = {}) {
+  const env = options.env ?? process.env
+  const home = options.home ?? homedir()
+  const readdir = options.readdir ?? readdirSync
+  const exists = options.exists ?? existsSync
+  const additions = {}
+
+  /** Whether a directory holds a Ghidra installation. */
+  const isGhidra = (dir) => exists(join(dir, 'Ghidra', 'application.properties'))
+    || exists(join(dir, 'support', 'analyzeHeadless'))
+
+  const declaredGhidra = env.GHIDRA_INSTALL_DIR
+  if (typeof declaredGhidra === 'string' && declaredGhidra.length > 0) {
+    additions.GHIDRA_INSTALL_DIR = declaredGhidra
+  } else {
+    const roots = [
+      join(home, '.local', 'opt'), join(home, 'opt'), join(home, 'tools'),
+      '/opt', '/usr/local/share', '/usr/share',
+    ]
+    for (const root of roots) {
+      let names = []
+      try {
+        names = readdir(root)
+      } catch {
+        continue
+      }
+      const hit = names
+        .filter((name) => name.toLowerCase().startsWith('ghidra'))
+        .map((name) => join(root, name))
+        .find(isGhidra)
+      if (hit !== undefined) {
+        additions.GHIDRA_INSTALL_DIR = hit
+        break
+      }
+    }
+  }
+
+  /** Whether a directory is a full JDK (Ghidra refuses a bare JRE). */
+  const isJdk = (dir) => exists(join(dir, 'bin', 'java'))
+  const declaredJava = env.JAVA_HOME
+  if (typeof declaredJava === 'string' && declaredJava.length > 0 && isJdk(declaredJava)) {
+    additions.JAVA_HOME = declaredJava
+  } else if (!String(env.PATH ?? '').split(delimiter).some((entry) => isExecutable(join(entry, 'java'), exists))) {
+    // Only hunt for a JDK when `java` is not already resolvable on PATH.
+    let candidates = []
+    for (const root of [join(home, '.local', 'opt'), join(home, 'opt'), '/opt', '/usr/lib/jvm']) {
+      try {
+        candidates = candidates.concat(readdir(root).map((name) => join(root, name)))
+      } catch {
+        // Absent root: keep looking.
+      }
+    }
+    const hit = candidates.find((dir) => /jdk|java|temurin|corretto|zulu/i.test(dir) && isJdk(dir))
+    if (hit !== undefined) {
+      additions.JAVA_HOME = hit
+      additions.PATH = `${join(hit, 'bin')}${delimiter}${env.PATH ?? ''}`
+    }
+  }
+  return additions
 }
 
 /**
